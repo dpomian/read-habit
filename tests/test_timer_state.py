@@ -118,11 +118,11 @@ def test_full_session_statistics():
     advance(1)
     stats = timer.stop()
 
-    assert stats.pages_read == 2
+    assert stats.pages_read == 3
     assert stats.slowest_page.page_number == 1
     assert stats.slowest_page.duration_seconds == 10
-    assert stats.fastest_page.page_number == 2
-    assert stats.fastest_page.duration_seconds == 7
+    assert stats.fastest_page.page_number == 3
+    assert stats.fastest_page.duration_seconds == 1
     assert stats.paused_seconds == 3
     assert stats.actual_reading_seconds == 10 + 7 + 1
     assert stats.elapsed_seconds == 10 + 5 + 3 + 2 + 1
