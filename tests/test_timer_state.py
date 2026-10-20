@@ -128,6 +128,33 @@ def test_full_session_statistics():
     assert stats.elapsed_seconds == 10 + 5 + 3 + 2 + 1
 
 
+def test_stop_while_running_counts_the_in_progress_page_as_read():
+    """Reproduces #7: stopping mid-page must count that page as read.
+
+    ``actual_reading_seconds`` already includes the time spent on the page
+    that was being read when ``stop`` was called, so ``pages_read`` (and
+    the fastest/slowest breakdown) must account for it too, instead of
+    silently dropping it.
+    """
+    clock, advance = make_clock()
+    timer = ReadingTimer(clock=clock)
+
+    timer.start()
+    advance(12)
+    timer.finish_page()  # page 1: 12s
+    advance(13)
+    timer.finish_page()  # page 2: 13s
+    advance(3)  # page 3: still being read when we stop
+    stats = timer.stop()
+
+    assert stats.pages_read == 3
+    assert stats.actual_reading_seconds == 12 + 13 + 3
+    assert stats.fastest_page.page_number == 3
+    assert stats.fastest_page.duration_seconds == 3
+    assert stats.slowest_page.page_number == 2
+    assert stats.slowest_page.duration_seconds == 13
+
+
 def test_fastest_and_slowest_page_identified():
     clock, advance = make_clock()
     timer = ReadingTimer(clock=clock)
