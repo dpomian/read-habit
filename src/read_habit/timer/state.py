@@ -79,6 +79,37 @@ class ReadingTimer:
         """Return the number of the page currently being read."""
         return self._page_number
 
+    def live_elapsed_seconds(self) -> float:
+        """Return the elapsed session time so far, including right now.
+
+        Returns ``0.0`` before the timer has started. Once stopped, the
+        final elapsed time is returned.
+        """
+        if self._session_start is None:
+            return 0.0
+        end = self._session_end if self._session_end is not None else self._clock()
+        return end - self._session_start
+
+    def live_page_seconds(self) -> float:
+        """Return the current page's reading time so far, including now.
+
+        While ``RUNNING`` this includes the time elapsed since the page
+        timer last resumed. While ``PAUSED`` or before the page has
+        started, the accumulated (frozen) time is returned.
+        """
+        if self._state is TimerState.RUNNING and self._page_started_at is not None:
+            return self._page_accumulated_seconds + (
+                self._clock() - self._page_started_at
+            )
+        return self._page_accumulated_seconds
+
+    def live_paused_seconds(self) -> float:
+        """Return the total paused time so far, including the current pause."""
+        paused = self._paused_seconds
+        if self._state is TimerState.PAUSED and self._pause_started_at is not None:
+            paused += self._clock() - self._pause_started_at
+        return paused
+
     def start(self) -> None:
         """Start the timer. Only valid from ``IDLE``."""
         if self._state is not TimerState.IDLE:

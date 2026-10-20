@@ -28,7 +28,7 @@ def timer_command() -> None:
       Space  mark the current page as finished (only while running)
     """
     click.echo("Reading timer -- Enter: start/stop, k: pause/resume, Space: next page.")
-    session = ReadingSession(read_key=click.getchar)
+    session = ReadingSession(read_key=click.getchar, live_display=True)
     stats = session.run()
     click.echo(format_stats(stats))
 
