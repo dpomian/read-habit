@@ -6,6 +6,8 @@ import click
 from pydantic import ValidationError
 
 from read_habit.book.repository import BookNotFoundError, BookRepository
+from read_habit.timer.formatting import format_seconds
+from read_habit.timer.repository import SessionRepository
 
 
 def _format_validation_error(exc: ValidationError) -> str:
@@ -83,3 +85,24 @@ def delete_command(book_id: int) -> None:
     except BookNotFoundError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"Deleted book #{book_id}")
+
+
+@book_group.command("sessions")
+@click.argument("book_id", type=int)
+def sessions_command(book_id: int) -> None:
+    """List reading sessions associated with a book."""
+    repo = BookRepository()
+    try:
+        book = repo.get(book_id)
+    except BookNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    sessions = [s for s in SessionRepository().list() if s.book_id == book_id]
+    if not sessions:
+        click.echo(f"No reading sessions recorded for '{book.title}' yet.")
+        return
+    for session in sessions:
+        click.echo(
+            f"#{session.id}: {session.stats.pages_read} pages, "
+            f"{format_seconds(session.stats.actual_reading_seconds)} reading time"
+        )

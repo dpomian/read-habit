@@ -5,8 +5,10 @@ from click.testing import CliRunner
 from read_habit.cli import cli
 
 
-def _invoke(args, books_path, monkeypatch):
+def _invoke(args, books_path, monkeypatch, sessions_path=None):
     monkeypatch.setattr("read_habit.book.repository.DEFAULT_BOOKS_PATH", books_path)
+    if sessions_path is not None:
+        monkeypatch.setattr("read_habit.timer.repository.DEFAULT_SESSIONS_PATH", sessions_path)
     return CliRunner().invoke(cli, args)
 
 
@@ -115,3 +117,46 @@ def test_delete_missing_book_fails(tmp_path, monkeypatch):
     result = _invoke(["book", "delete", "999"], tmp_path / "books.json", monkeypatch)
     assert result.exit_code != 0
     assert "No book with id 999" in result.output
+
+
+def test_sessions_for_unknown_book_fails(tmp_path, monkeypatch):
+    result = _invoke(["book", "sessions", "999"], tmp_path / "books.json", monkeypatch)
+    assert result.exit_code != 0
+    assert "No book with id 999" in result.output
+
+
+def test_sessions_empty_for_existing_book(tmp_path, monkeypatch):
+    books_path = tmp_path / "books.json"
+    sessions_path = tmp_path / "sessions.json"
+    _invoke(["book", "add", "Dune"], books_path, monkeypatch, sessions_path)
+
+    result = _invoke(["book", "sessions", "1"], books_path, monkeypatch, sessions_path)
+    assert result.exit_code == 0
+    assert "No reading sessions recorded for 'Dune'" in result.output
+
+
+def test_sessions_lists_only_sessions_for_that_book(tmp_path, monkeypatch):
+    books_path = tmp_path / "books.json"
+    sessions_path = tmp_path / "sessions.json"
+    _invoke(["book", "add", "Dune"], books_path, monkeypatch, sessions_path)
+
+    from read_habit.timer.models import PageRecord, TimerStats
+    from read_habit.timer.repository import SessionRepository
+
+    page = PageRecord(page_number=1, duration_seconds=5)
+    stats = TimerStats(
+        pages_read=1,
+        slowest_page=page,
+        fastest_page=page,
+        actual_reading_seconds=5,
+        elapsed_seconds=5,
+        paused_seconds=0,
+    )
+    session_repo = SessionRepository(path=sessions_path)
+    session_repo.add(stats, book_id=1)
+    session_repo.add(stats, book_id=None)
+
+    result = _invoke(["book", "sessions", "1"], books_path, monkeypatch, sessions_path)
+    assert result.exit_code == 0
+    assert "#1" in result.output
+    assert "1 pages" in result.output

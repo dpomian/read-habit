@@ -25,3 +25,17 @@ class TimerStats(BaseModel):
     actual_reading_seconds: float = Field(ge=0)
     elapsed_seconds: float = Field(ge=0)
     paused_seconds: float = Field(ge=0)
+
+
+class ReadingSessionRecord(BaseModel):
+    """A persisted reading session, optionally linked to a book.
+
+    Produced when an interactive timer session stops. ``book_id`` is
+    ``None`` for sessions that were not associated with any book.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int = Field(ge=1)
+    book_id: int | None = None
+    stats: TimerStats
