@@ -1,9 +1,9 @@
 """Tests for the read-habit CLI."""
 
-import pytest
+from click.testing import CliRunner
 
 from read_habit import __version__
-from read_habit.cli import build_parser, main
+from read_habit.cli import cli, main
 
 
 def test_main_returns_zero(capsys):
@@ -12,10 +12,7 @@ def test_main_returns_zero(capsys):
     assert "read-habit" in captured.out
 
 
-def test_version_flag(capsys):
-    parser = build_parser()
-    with pytest.raises(SystemExit) as exc:
-        parser.parse_args(["--version"])
-    assert exc.value.code == 0
-    captured = capsys.readouterr()
-    assert __version__ in captured.out
+def test_version_flag():
+    result = CliRunner().invoke(cli, ["--version"])
+    assert result.exit_code == 0
+    assert __version__ in result.output

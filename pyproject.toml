@@ -6,7 +6,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "dpomian" }]
-dependencies = []
+dependencies = [
+    "click>=8.5.0",
+    "pydantic>=2.14.1",
+]
 
 [project.scripts]
 read-habit = "read_habit.cli:main"
