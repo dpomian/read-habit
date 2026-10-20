@@ -76,6 +76,26 @@ def test_format_live_status_running_and_paused():
     assert "(paused)" in paused_status
 
 
+def test_default_render_overwrites_line_without_newline(capsys):
+    # The default renderer must write directly to stdout with a leading
+    # ``\r`` and no trailing newline, so repeated calls overwrite the
+    # same terminal line instead of scrolling a new one each tick.
+    timer = ReadingTimer(clock=make_clock())
+    session = ReadingSession(
+        read_key=keys_from_sequence([]),
+        timer=timer,
+        echo=lambda *_: None,
+    )
+
+    session._default_render("Elapsed: 0m 1s")
+    session._default_render("Elapsed: 0m 2s")
+
+    captured = capsys.readouterr().out
+    assert "\n" not in captured
+    assert captured.count("\r") == 2
+    assert captured.endswith("Elapsed: 0m 2s\x1b[K")
+
+
 def test_live_display_renders_status_updates_while_running():
     read_key = keys_from_sequence(["\r", " ", "\r"])
     rendered: list[str] = []

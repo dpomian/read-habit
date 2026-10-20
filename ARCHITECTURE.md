@@ -23,7 +23,12 @@ with `click`, and data is modeled with `pydantic`.
   interactive key-driven loop on top of a `ReadingTimer`: it reads one key
   at a time via an injectable `read_key` callable (`click.getchar` by
   default), maps `Enter`/`k`/`Space` to timer actions, and ignores keys
-  that are invalid in the current state.
+  that are invalid in the current state. When `live_display=True`, a
+  daemon ticker thread periodically renders the elapsed/per-page/paused
+  status in place (by default writing `\r<status>` directly to stdout, no
+  trailing newline, so each tick overwrites the previous one); a lock
+  shared with the main thread's progress messages prevents the two from
+  interleaving on screen.
 - **`src/read_habit/timer/models.py`** -- `pydantic` models `PageRecord`
   (page number and duration) and `TimerStats` (session summary: pages
   read, slowest/fastest page, actual reading time, elapsed time, paused

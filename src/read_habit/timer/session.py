@@ -14,6 +14,7 @@ callable, so it can be driven by real terminal input (the default, using
 
 from __future__ import annotations
 
+import sys
 import threading
 from collections.abc import Callable, Iterable
 
@@ -61,6 +62,7 @@ class ReadingSession:
         self._render_live_status = render_live_status or self._default_render
         self._stop_ticking = threading.Event()
         self._ticker_thread: threading.Thread | None = None
+        self._output_lock = threading.Lock()
 
     def run(self) -> TimerStats:
         """Run the session until the timer is stopped and return stats."""
@@ -71,7 +73,7 @@ class ReadingSession:
                 key = self._read_key()
                 if key in ENTER_KEYS:
                     self._timer.start()
-                    self._echo("Timer started. Reading page 1.")
+                    self._echo_locked("Timer started. Reading page 1.")
 
             while True:
                 key = self._read_key()
@@ -102,31 +104,41 @@ class ReadingSession:
 
     def _tick_loop(self) -> None:
         while not self._stop_ticking.is_set():
-            self._render_live_status(format_live_status(self._timer))
+            with self._output_lock:
+                self._render_live_status(format_live_status(self._timer))
             if self._timer.state is TimerState.STOPPED:
                 break
             self._stop_ticking.wait(self._tick_seconds)
 
     def _default_render(self, status: str) -> None:
-        self._echo(f"\r{status}")
+        # Write directly to stdout (not through ``self._echo``/``print``)
+        # so the line can be overwritten in place: ``print`` always ends
+        # with a newline, which would make ``\r`` scroll a new line on
+        # every tick instead of refreshing the current one.
+        sys.stdout.write(f"\r{status}\x1b[K")
+        sys.stdout.flush()
+
+    def _echo_locked(self, message: str) -> None:
+        with self._output_lock:
+            self._echo(message)
 
     def _handle_key(self, key: str) -> TimerStats | None:
         if key in ENTER_KEYS:
             stats = self._timer.stop()
-            self._echo("Timer stopped.")
+            self._echo_locked("Timer stopped.")
             return stats
         if key == PAUSE_RESUME_KEY:
             if self._timer.state is TimerState.RUNNING:
                 self._timer.pause()
-                self._echo("Timer paused. Press 'k' to resume.")
+                self._echo_locked("Timer paused. Press 'k' to resume.")
             else:
                 self._timer.resume()
-                self._echo(f"Timer resumed. Reading page {self._timer.current_page}.")
+                self._echo_locked(f"Timer resumed. Reading page {self._timer.current_page}.")
             return None
         if key == FINISH_PAGE_KEY:
             finished_page = self._timer.current_page
             self._timer.finish_page()
-            self._echo(
+            self._echo_locked(
                 f"Page {finished_page} finished. Reading page "
                 f"{self._timer.current_page}."
             )
