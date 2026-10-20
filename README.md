@@ -29,6 +29,12 @@ Start an interactive reading timer session:
 uv run read-habit timer
 ```
 
+Optionally link the session to a book by id:
+
+```bash
+uv run read-habit timer --book 1
+```
+
 Controls:
 
 - `Enter` -- start the timer (while idle), or stop it (any time once started).
@@ -42,7 +48,9 @@ paused respectively. While the timer is running or paused, a live status
 line showing the elapsed session time, the current page's reading time,
 and total paused time is updated in real time. When stopped, it prints
 pages read, slowest page, fastest page, actual reading time, elapsed time,
-and time spent paused.
+and time spent paused. Every session is persisted as a JSON record at
+`~/.read-habit/sessions.json`, including the id of the book it was linked
+to (if any).
 
 ### Books
 
@@ -54,7 +62,11 @@ uv run read-habit book add "Dune" --author "Frank Herbert" --pages 412
 uv run read-habit book list
 uv run read-habit book update 1 --pages 420
 uv run read-habit book delete 1
+uv run read-habit book sessions 1
 ```
+
+`book sessions <id>` lists the reading sessions recorded for that book
+(pages read and reading time for each).
 
 You can also run the package directly as a module:
 
@@ -90,7 +102,8 @@ read-habit/
 │           ├── state.py       # ReadingTimer finite state machine
 │           ├── session.py     # interactive key-driven loop
 │           ├── models.py      # pydantic data models
-│           └── formatting.py  # stats presentation
+│           ├── formatting.py  # stats presentation
+│           └── repository.py  # JSON-backed session persistence
 └── tests/                # test suite
 ```
 

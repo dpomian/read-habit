@@ -39,6 +39,14 @@ with `click`, and data is modeled with `pydantic`.
 - **`src/read_habit/timer/formatting.py`** -- `format_stats()` renders a
   `TimerStats` instance as a human-readable summary block printed when a
   session stops.
+- **`src/read_habit/timer/repository.py`** -- `SessionRepository`, a
+  JSON-file-backed store for `ReadingSessionRecord` entities, defaulting to
+  `~/.read-habit/sessions.json` (overridable via the constructor). `add()`
+  persists a `TimerStats` together with an optional `book_id`, assigning
+  the next free id; `list()` returns all stored sessions sorted by id.
+- **`src/read_habit/timer/models.py`** -- also defines
+  `ReadingSessionRecord` (id, optional `book_id`, `TimerStats`), the
+  persisted representation of a finished session.
 - **`src/read_habit/book/models.py`** -- `pydantic` model `Book` (id,
   title, optional author, optional total pages) representing a book that
   reading sessions can be linked to.
@@ -49,27 +57,35 @@ with `click`, and data is modeled with `pydantic`.
   next free id on `add()`, and raises `BookNotFoundError` from `get()`,
   `update()` and `delete()` when the id doesn't exist.
 - **`src/read_habit/book/cli.py`** -- `book` `click` group with `add`,
-  `list`, `update` and `delete` subcommands, each operating on a
-  `BookRepository` instance.
+  `list`, `update`, `delete` and `sessions` subcommands; `sessions`
+  resolves the book via `BookRepository` and filters
+  `SessionRepository.list()` by `book_id`.
 
 ## Data flow
 
-1. The user runs `read-habit timer`, which constructs a `ReadingSession`
-   wrapping a `ReadingTimer`.
+1. The user runs `read-habit timer` (optionally with `--book <id>`, which
+   is validated against `BookRepository` up front), constructing a
+   `ReadingSession` wrapping a `ReadingTimer`.
 2. `ReadingSession.run()` loops: it reads a key, forwards it to the timer
    (`start`/`pause`/`resume`/`finish_page`/`stop`), and echoes progress
    messages. Invalid actions for the current state raise
    `InvalidTimerTransition` and are silently ignored.
 3. On `stop()`, `ReadingTimer` returns a `TimerStats` instance, which
-   `cli.py` passes to `format_stats()` and prints to the terminal.
+   `cli.py` passes to `format_stats()` and prints to the terminal, then
+   persists via `SessionRepository.add(stats, book_id=...)` as a
+   `ReadingSessionRecord`.
+4. `read-habit book sessions <id>` reads all records via
+   `SessionRepository.list()` and filters them by `book_id` to show the
+   sessions linked to that book.
 
 ## Where features live
 
-- Reading timer feature (state machine, interactive loop, stats): entirely
-  under `src/read_habit/timer/`.
-- Book management (model, JSON persistence, CLI commands): entirely under
-  `src/read_habit/book/`.
+- Reading timer feature (state machine, interactive loop, stats,
+  persistence): entirely under `src/read_habit/timer/`.
+- Book management (model, JSON persistence, CLI commands, linking
+  sessions to a book): entirely under `src/read_habit/book/`.
 - CLI wiring and command definitions: `src/read_habit/cli.py`.
 - Tests mirror this structure under `tests/` (`test_cli.py`,
-  `test_timer_session.py`, `test_timer_state.py`, `test_book_cli.py`,
+  `test_timer_session.py`, `test_timer_state.py`, `test_timer_cli.py`,
+  `test_timer_repository.py`, `test_book_cli.py`,
   `test_book_repository.py`).
