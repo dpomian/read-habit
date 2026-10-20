@@ -9,7 +9,7 @@ with `click`, and data is modeled with `pydantic`.
 ## Main components
 
 - **`src/read_habit/cli.py`** -- CLI entry point. Defines the `read-habit`
-  `click` group and registers the `timer` and `book` subcommands.
+  `click` group and registers the `read` and `book` subcommands.
   `main()` is the console script entry point registered in
   `pyproject.toml`.
 - **`src/read_habit/timer/state.py`** -- `ReadingTimer`, a finite state
@@ -63,7 +63,7 @@ with `click`, and data is modeled with `pydantic`.
 
 ## Data flow
 
-1. The user runs `read-habit timer` (optionally with `--book <id>`, which
+1. The user runs `read-habit read` (optionally with `--book <id>`, which
    is validated against `BookRepository` up front), constructing a
    `ReadingSession` wrapping a `ReadingTimer`.
 2. `ReadingSession.run()` loops: it reads a key, forwards it to the timer

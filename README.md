@@ -26,13 +26,13 @@ uv run read-habit --help
 Start an interactive reading timer session:
 
 ```bash
-uv run read-habit timer
+uv run read-habit read
 ```
 
 Optionally link the session to a book by id:
 
 ```bash
-uv run read-habit timer --book 1
+uv run read-habit read --book 1
 ```
 
 Controls:
