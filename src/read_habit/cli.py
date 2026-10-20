@@ -6,7 +6,9 @@ import click
 
 from read_habit import __version__
 from read_habit.book.cli import book_group
+from read_habit.book.repository import BookNotFoundError, BookRepository
 from read_habit.timer.formatting import format_stats
+from read_habit.timer.repository import SessionRepository
 from read_habit.timer.session import ReadingSession
 
 
@@ -23,7 +25,14 @@ cli.add_command(book_group)
 
 
 @cli.command("timer")
-def timer_command() -> None:
+@click.option(
+    "--book",
+    "book_id",
+    type=int,
+    default=None,
+    help="Id of the book this reading session is for.",
+)
+def timer_command(book_id: int | None) -> None:
     """Run an interactive reading timer session.
 
     Controls:
@@ -31,10 +40,19 @@ def timer_command() -> None:
       k      pause while running, resume while paused
       Space  mark the current page as finished (only while running)
     """
-    click.echo("Reading timer -- Enter: start/stop, k: pause/resume, Space: next page.")
+    if book_id is not None:
+        try:
+            book = BookRepository().get(book_id)
+        except BookNotFoundError as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"Reading timer for '{book.title}' -- Enter: start/stop, k: pause/resume, Space: next page.")
+    else:
+        click.echo("Reading timer -- Enter: start/stop, k: pause/resume, Space: next page.")
+
     session = ReadingSession(read_key=click.getchar, live_display=True)
     stats = session.run()
     click.echo(format_stats(stats))
+    SessionRepository().add(stats, book_id=book_id)
 
 
 def main(argv: list[str] | None = None) -> int:
