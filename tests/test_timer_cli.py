@@ -1,4 +1,4 @@
-"""Tests for the `timer` CLI command, in particular book association (#11)."""
+"""Tests for the `read` CLI command, in particular book association (#11)."""
 
 from click.testing import CliRunner
 
@@ -36,7 +36,7 @@ def test_timer_without_book_persists_session_with_no_book_id(tmp_path, monkeypat
     books_path = tmp_path / "books.json"
     sessions_path = tmp_path / "sessions.json"
 
-    result = _invoke(["timer"], books_path, sessions_path, monkeypatch)
+    result = _invoke(["read"], books_path, sessions_path, monkeypatch)
 
     assert result.exit_code == 0
     from read_habit.timer.repository import SessionRepository
@@ -55,7 +55,7 @@ def test_timer_with_valid_book_associates_session(tmp_path, monkeypatch):
 
     book = BookRepository(path=books_path).add(title="Dune")
 
-    result = _invoke(["timer", "--book", str(book.id)], books_path, sessions_path, monkeypatch)
+    result = _invoke(["read", "--book", str(book.id)], books_path, sessions_path, monkeypatch)
 
     assert result.exit_code == 0
     assert "Dune" in result.output
@@ -69,7 +69,7 @@ def test_timer_with_unknown_book_fails_without_persisting(tmp_path, monkeypatch)
     books_path = tmp_path / "books.json"
     sessions_path = tmp_path / "sessions.json"
 
-    result = _invoke(["timer", "--book", "999"], books_path, sessions_path, monkeypatch)
+    result = _invoke(["read", "--book", "999"], books_path, sessions_path, monkeypatch)
 
     assert result.exit_code != 0
     assert "No book with id 999" in result.output

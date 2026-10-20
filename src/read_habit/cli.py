@@ -24,7 +24,7 @@ def cli(ctx: click.Context) -> None:
 cli.add_command(book_group)
 
 
-@cli.command("timer")
+@cli.command("read")
 @click.option(
     "--book",
     "book_id",
@@ -32,7 +32,7 @@ cli.add_command(book_group)
     default=None,
     help="Id of the book this reading session is for.",
 )
-def timer_command(book_id: int | None) -> None:
+def read_command(book_id: int | None) -> None:
     """Run an interactive reading timer session.
 
     Controls:
