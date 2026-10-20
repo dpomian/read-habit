@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from read_habit import __version__
+from read_habit.book.cli import book_group
 from read_habit.timer.formatting import format_stats
 from read_habit.timer.session import ReadingSession
 
@@ -16,6 +17,9 @@ def cli(ctx: click.Context) -> None:
     """Track your reading habits from the command line."""
     if ctx.invoked_subcommand is None:
         click.echo("read-habit: nothing to do yet. Try --help.")
+
+
+cli.add_command(book_group)
 
 
 @cli.command("timer")

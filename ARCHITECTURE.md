@@ -9,9 +9,9 @@ with `click`, and data is modeled with `pydantic`.
 ## Main components
 
 - **`src/read_habit/cli.py`** -- CLI entry point. Defines the `read-habit`
-  `click` group and the `timer` subcommand, which is the home of the
-  reading timer feature. `main()` is the console script entry point
-  registered in `pyproject.toml`.
+  `click` group and registers the `timer` and `book` subcommands.
+  `main()` is the console script entry point registered in
+  `pyproject.toml`.
 - **`src/read_habit/timer/state.py`** -- `ReadingTimer`, a finite state
   machine with states `IDLE`, `RUNNING`, `PAUSED`, `STOPPED`. It enforces
   valid transitions (e.g. a page can only be finished while `RUNNING`,
@@ -39,6 +39,18 @@ with `click`, and data is modeled with `pydantic`.
 - **`src/read_habit/timer/formatting.py`** -- `format_stats()` renders a
   `TimerStats` instance as a human-readable summary block printed when a
   session stops.
+- **`src/read_habit/book/models.py`** -- `pydantic` model `Book` (id,
+  title, optional author, optional total pages) representing a book that
+  reading sessions can be linked to.
+- **`src/read_habit/book/repository.py`** -- `BookRepository`, a
+  JSON-file-backed CRUD store for `Book` entities, defaulting to
+  `~/.read-habit/books.json` (overridable via the constructor). Loads and
+  dumps the whole list through a `pydantic` `TypeAdapter`, assigns the
+  next free id on `add()`, and raises `BookNotFoundError` from `get()`,
+  `update()` and `delete()` when the id doesn't exist.
+- **`src/read_habit/book/cli.py`** -- `book` `click` group with `add`,
+  `list`, `update` and `delete` subcommands, each operating on a
+  `BookRepository` instance.
 
 ## Data flow
 
@@ -55,6 +67,9 @@ with `click`, and data is modeled with `pydantic`.
 
 - Reading timer feature (state machine, interactive loop, stats): entirely
   under `src/read_habit/timer/`.
+- Book management (model, JSON persistence, CLI commands): entirely under
+  `src/read_habit/book/`.
 - CLI wiring and command definitions: `src/read_habit/cli.py`.
 - Tests mirror this structure under `tests/` (`test_cli.py`,
-  `test_timer_session.py`, `test_timer_state.py`).
+  `test_timer_session.py`, `test_timer_state.py`, `test_book_cli.py`,
+  `test_book_repository.py`).
