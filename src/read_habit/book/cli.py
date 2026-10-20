@@ -3,8 +3,17 @@
 from __future__ import annotations
 
 import click
+from pydantic import ValidationError
 
 from read_habit.book.repository import BookNotFoundError, BookRepository
+
+
+def _format_validation_error(exc: ValidationError) -> str:
+    messages = []
+    for error in exc.errors():
+        field = ".".join(str(part) for part in error["loc"]) or "value"
+        messages.append(f"{field}: {error['msg']}")
+    return "; ".join(messages)
 
 
 def _format_book(book) -> str:
@@ -28,7 +37,10 @@ def book_group() -> None:
 def add_command(title: str, author: str | None, total_pages: int | None) -> None:
     """Add a new book."""
     repo = BookRepository()
-    book = repo.add(title=title, author=author, total_pages=total_pages)
+    try:
+        book = repo.add(title=title, author=author, total_pages=total_pages)
+    except ValidationError as exc:
+        raise click.ClickException(_format_validation_error(exc)) from exc
     click.echo(f"Added {_format_book(book)}")
 
 
@@ -56,6 +68,8 @@ def update_command(book_id: int, title: str | None, author: str | None, total_pa
         book = repo.update(book_id, title=title, author=author, total_pages=total_pages)
     except BookNotFoundError as exc:
         raise click.ClickException(str(exc)) from exc
+    except ValidationError as exc:
+        raise click.ClickException(_format_validation_error(exc)) from exc
     click.echo(f"Updated {_format_book(book)}")
 
 

@@ -71,17 +71,17 @@ class BookRepository:
         books = self._load()
         for index, book in enumerate(books):
             if book.id == book_id:
-                updated = book.model_copy(
-                    update={
-                        key: value
-                        for key, value in {
-                            "title": title,
-                            "author": author,
-                            "total_pages": total_pages,
-                        }.items()
-                        if value is not None
-                    }
-                )
+                updates = {
+                    key: value
+                    for key, value in {
+                        "title": title,
+                        "author": author,
+                        "total_pages": total_pages,
+                    }.items()
+                    if value is not None
+                }
+                merged = {**book.model_dump(), **updates}
+                updated = Book(**merged)
                 books[index] = updated
                 self._save(books)
                 return updated

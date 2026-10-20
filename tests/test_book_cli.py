@@ -48,6 +48,40 @@ def test_update_missing_book_fails(tmp_path, monkeypatch):
     assert "No book with id 999" in result.output
 
 
+def test_add_empty_title_fails(tmp_path, monkeypatch):
+    result = _invoke(["book", "add", ""], tmp_path / "books.json", monkeypatch)
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "title" in result.output
+
+
+def test_add_non_positive_pages_fails(tmp_path, monkeypatch):
+    result = _invoke(["book", "add", "Dune", "--pages", "0"], tmp_path / "books.json", monkeypatch)
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "total_pages" in result.output
+
+
+def test_update_empty_title_fails(tmp_path, monkeypatch):
+    books_path = tmp_path / "books.json"
+    _invoke(["book", "add", "Dune"], books_path, monkeypatch)
+
+    result = _invoke(["book", "update", "1", "--title", ""], books_path, monkeypatch)
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "title" in result.output
+
+
+def test_update_non_positive_pages_fails(tmp_path, monkeypatch):
+    books_path = tmp_path / "books.json"
+    _invoke(["book", "add", "Dune"], books_path, monkeypatch)
+
+    result = _invoke(["book", "update", "1", "--pages", "-5"], books_path, monkeypatch)
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "total_pages" in result.output
+
+
 def test_delete(tmp_path, monkeypatch):
     books_path = tmp_path / "books.json"
     _invoke(["book", "add", "Dune"], books_path, monkeypatch)
