@@ -44,6 +44,18 @@ and total paused time is updated in real time. When stopped, it prints
 pages read, slowest page, fastest page, actual reading time, elapsed time,
 and time spent paused.
 
+### Books
+
+Manage books that reading sessions can be linked to. Books are persisted
+as a JSON file at `~/.read-habit/books.json`.
+
+```bash
+uv run read-habit book add "Dune" --author "Frank Herbert" --pages 412
+uv run read-habit book list
+uv run read-habit book update 1 --pages 420
+uv run read-habit book delete 1
+```
+
 You can also run the package directly as a module:
 
 ```bash
@@ -68,6 +80,11 @@ read-habit/
 │       ├── __init__.py
 │       ├── __main__.py   # enables `python -m read_habit`
 │       ├── cli.py        # CLI entry point (click)
+│       ├── book/         # book entity, JSON persistence and CLI commands
+│       │   ├── __init__.py
+│       │   ├── models.py      # pydantic Book model
+│       │   ├── repository.py  # JSON-backed CRUD repository
+│       │   └── cli.py         # `book` command group
 │       └── timer/        # reading timer state machine and session
 │           ├── __init__.py
 │           ├── state.py       # ReadingTimer finite state machine
