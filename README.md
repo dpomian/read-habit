@@ -45,7 +45,7 @@ Controls:
 The timer enforces these states: a page cannot be marked finished while
 paused, and pausing/resuming is only possible when the timer is running or
 paused respectively. While the timer is running or paused, a live,
-centered status screen -- showing the book title (if any), the current
+centered status screen -- showing the book title and author (if any), the current
 status (`READING`/`PAUSED`), the elapsed and actual reading time, the
 control reminders, and the current page with its own elapsed time -- is
 redrawn in place every second. When stopped, it prints pages read, slowest

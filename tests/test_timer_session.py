@@ -84,6 +84,18 @@ def test_format_live_status_includes_book_title():
     assert "Dune" in status
 
 
+def test_format_live_status_includes_book_title_and_author():
+    timer = ReadingTimer(clock=make_clock())
+    status = format_live_status(
+        timer, book_title="Dune", book_author="Frank Herbert", width=40
+    )
+    assert "Dune" in status
+    assert "Frank Herbert" in status
+    assert "New reading session for 'Dune', by Frank Herbert" in status.replace(
+        "\n", ""
+    )
+
+
 def test_format_live_status_centers_lines():
     timer = ReadingTimer(clock=make_clock())
     status = format_live_status(timer, width=40)

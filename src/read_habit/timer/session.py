@@ -30,7 +30,10 @@ DEFAULT_TICK_SECONDS = 0.2
 
 
 def format_live_status(
-    timer: ReadingTimer, book_title: str | None = None, width: int | None = None
+    timer: ReadingTimer,
+    book_title: str | None = None,
+    width: int | None = None,
+    book_author: str | None = None,
 ) -> str:
     """Render the full live session display for the current timer state."""
     state = timer.state
@@ -38,6 +41,8 @@ def format_live_status(
         status_label = "PAUSED"
     elif state is TimerState.IDLE:
         status_label = "WAITING TO START"
+    elif state is TimerState.STOPPED:
+        status_label = "STOPPED"
     else:
         status_label = "READING"
     return format_session_display(
@@ -48,6 +53,7 @@ def format_live_status(
         current_page=timer.current_page,
         page_seconds=timer.live_page_seconds(),
         width=width,
+        book_author=book_author,
     )
 
 
@@ -63,6 +69,7 @@ class ReadingSession:
         tick_seconds: float = DEFAULT_TICK_SECONDS,
         render_live_status: Callable[[str], None] | None = None,
         book_title: str | None = None,
+        book_author: str | None = None,
     ) -> None:
         self._read_key = read_key
         self._timer = timer if timer is not None else ReadingTimer()
@@ -71,6 +78,7 @@ class ReadingSession:
         self._tick_seconds = tick_seconds
         self._render_live_status = render_live_status or self._default_render
         self._book_title = book_title
+        self._book_author = book_author
         self._stop_ticking = threading.Event()
         self._ticker_thread: threading.Thread | None = None
         self._output_lock = threading.Lock()
@@ -118,7 +126,11 @@ class ReadingSession:
         while not self._stop_ticking.is_set():
             with self._output_lock:
                 self._render_live_status(
-                    format_live_status(self._timer, book_title=self._book_title)
+                    format_live_status(
+                        self._timer,
+                        book_title=self._book_title,
+                        book_author=self._book_author,
+                    )
                 )
             if self._timer.state is TimerState.STOPPED:
                 break
@@ -141,6 +153,13 @@ class ReadingSession:
     def _echo_locked(self, message: str) -> None:
         with self._output_lock:
             self._echo(message)
+            # ``self._echo`` prints a normal scrolling line below the live
+            # block, so the cursor is now below whatever was last rendered.
+            # Forget the previous block's line count so the next tick
+            # starts a fresh block instead of moving the cursor up into
+            # the just-printed message (which caused the title/header to
+            # appear duplicated down the screen).
+            self._rendered_line_count = 0
 
     def _handle_key(self, key: str) -> TimerStats | None:
         if key in ENTER_KEYS:

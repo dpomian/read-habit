@@ -39,16 +39,22 @@ def format_session_display(
     current_page: int,
     page_seconds: float,
     width: int | None = None,
+    book_author: str | None = None,
 ) -> str:
     """Render the full, centered live session layout.
 
     Produces the multi-line block described in the feature request: a
-    title line naming the book (if any), the current status, the running
-    elapsed/actual times, the control reminders, and the current page
-    with its own elapsed time. The whole block is centered line by line
-    so it stays nicely aligned in the terminal.
+    title line naming the book (and author, if any), the current status,
+    the running elapsed/actual times, the control reminders, and the
+    current page with its own elapsed time. The whole block is centered
+    line by line so it stays nicely aligned in the terminal.
     """
-    title = f"New reading session for '{book_title}'" if book_title else "New reading session"
+    if book_title and book_author:
+        title = f"New reading session for '{book_title}', by {book_author}"
+    elif book_title:
+        title = f"New reading session for '{book_title}'"
+    else:
+        title = "New reading session"
     lines = [
         title,
         "",

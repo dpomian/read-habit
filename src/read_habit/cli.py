@@ -41,18 +41,23 @@ def read_command(book_id: int | None) -> None:
       Space  mark the current page as finished (only while running)
     """
     book_title: str | None = None
+    book_author: str | None = None
     if book_id is not None:
         try:
             book = BookRepository().get(book_id)
         except BookNotFoundError as exc:
             raise click.ClickException(str(exc)) from exc
         book_title = book.title
+        book_author = book.author
         click.echo(f"Reading timer for '{book_title}'.")
     else:
         click.echo("Reading timer.")
 
     session = ReadingSession(
-        read_key=click.getchar, live_display=True, book_title=book_title
+        read_key=click.getchar,
+        live_display=True,
+        book_title=book_title,
+        book_author=book_author,
     )
     stats = session.run()
     click.echo(format_stats(stats))
