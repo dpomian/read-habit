@@ -25,9 +25,12 @@ with `click`, and data is modeled with `pydantic`.
   default), maps `Enter`/`k`/`Space` to timer actions, and ignores keys
   that are invalid in the current state. When `live_display=True`, a
   daemon ticker thread periodically renders the elapsed/per-page/paused
-  status in place (by default writing `\r<status>` directly to stdout, no
-  trailing newline, so each tick overwrites the previous one); a lock
-  shared with the main thread's progress messages prevents the two from
+  status in place: the default renderer writes directly to `sys.stdout`
+  (bypassing `echo`/`print`, which would append a newline and break the
+  overwrite) with a `\r<status>\x1b[K` sequence that returns to the start
+  of the line and clears it before printing the new status, so each tick
+  overwrites the previous one in place. A lock shared between the ticker
+  thread and the main thread's progress messages prevents the two from
   interleaving on screen.
 - **`src/read_habit/timer/models.py`** -- `pydantic` models `PageRecord`
   (page number and duration) and `TimerStats` (session summary: pages
