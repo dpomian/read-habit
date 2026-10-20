@@ -183,10 +183,21 @@ class ReadingTimer:
         now = self._clock()
         if self._state is TimerState.RUNNING:
             assert self._page_started_at is not None
-            self._actual_reading_seconds += now - self._page_started_at
+            elapsed = now - self._page_started_at
+            self._actual_reading_seconds += elapsed
+            duration = self._page_accumulated_seconds + elapsed
         else:
             assert self._pause_started_at is not None
             self._paused_seconds += now - self._pause_started_at
+            duration = self._page_accumulated_seconds
+
+        if duration > 0:
+            # The page being read when the timer stopped was never finished
+            # explicitly via ``finish_page``, but some time was spent on
+            # it, so it still counts as read.
+            self._page_records.append(
+                PageRecord(page_number=self._page_number, duration_seconds=duration)
+            )
 
         self._session_end = now
         self._state = TimerState.STOPPED
