@@ -82,6 +82,23 @@ def test_update_non_positive_pages_fails(tmp_path, monkeypatch):
     assert "total_pages" in result.output
 
 
+def test_add_whitespace_only_title_fails(tmp_path, monkeypatch):
+    result = _invoke(["book", "add", "   "], tmp_path / "books.json", monkeypatch)
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "title" in result.output
+
+
+def test_add_strips_title_whitespace(tmp_path, monkeypatch):
+    books_path = tmp_path / "books.json"
+    add_result = _invoke(["book", "add", "  Dune  "], books_path, monkeypatch)
+    assert add_result.exit_code == 0
+
+    list_result = _invoke(["book", "list"], books_path, monkeypatch)
+    assert "Dune" in list_result.output
+    assert "  Dune  " not in list_result.output
+
+
 def test_delete(tmp_path, monkeypatch):
     books_path = tmp_path / "books.json"
     _invoke(["book", "add", "Dune"], books_path, monkeypatch)
