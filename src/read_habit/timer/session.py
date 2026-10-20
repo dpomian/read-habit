@@ -150,16 +150,38 @@ class ReadingSession:
         self._rendered_line_count = len(lines)
         sys.stdout.flush()
 
+    def _clear_rendered_block(self) -> None:
+        # Move the cursor back up to the start of the previously rendered
+        # live block (if any) and blank out each of its lines, so the
+        # block does not linger on screen as a stale, duplicate frame.
+        if not self._rendered_line_count:
+            return
+        sys.stdout.write(f"\x1b[{self._rendered_line_count}A")
+        for _ in range(self._rendered_line_count):
+            sys.stdout.write("\r\x1b[K\n")
+        sys.stdout.write(f"\x1b[{self._rendered_line_count}A")
+        sys.stdout.flush()
+        self._rendered_line_count = 0
+
     def _echo_locked(self, message: str) -> None:
         with self._output_lock:
+            # Erase the previous live block before printing a normal
+            # scrolling message, otherwise the block is left behind on
+            # screen and a fresh block printed below it every tick ends
+            # up duplicating the title/header down the page.
+            self._clear_rendered_block()
             self._echo(message)
-            # ``self._echo`` prints a normal scrolling line below the live
-            # block, so the cursor is now below whatever was last rendered.
-            # Forget the previous block's line count so the next tick
-            # starts a fresh block instead of moving the cursor up into
-            # the just-printed message (which caused the title/header to
-            # appear duplicated down the screen).
-            self._rendered_line_count = 0
+            if self._live_display:
+                # Redraw the block immediately below the message instead
+                # of waiting for the next tick, so there is no stale gap
+                # and the next tick's cursor-up tracking starts in sync.
+                self._render_live_status(
+                    format_live_status(
+                        self._timer,
+                        book_title=self._book_title,
+                        book_author=self._book_author,
+                    )
+                )
 
     def _handle_key(self, key: str) -> TimerStats | None:
         if key in ENTER_KEYS:

@@ -126,6 +126,40 @@ def test_default_render_overwrites_block_without_scrolling(capsys):
     assert "\x1b[2A" in second
 
 
+def test_echo_locked_clears_previous_block_before_scrolling_message(capsys):
+    # Regression test for the header duplicating down the screen every
+    # time a page finished: before this fix, ``_echo_locked`` printed the
+    # scrolling message without erasing the previously rendered live
+    # block first, so the block (including the "New reading session
+    # for..." title) stayed on screen and a new one was rendered below it
+    # on every tick, stacking up down the page.
+    timer = ReadingTimer(clock=make_clock())
+    rendered: list[str] = []
+    session = ReadingSession(
+        read_key=keys_from_sequence([]),
+        timer=timer,
+        echo=lambda msg: rendered.append(("echo", msg)),
+        live_display=True,
+        render_live_status=lambda status: rendered.append(("render", status)),
+    )
+
+    # Simulate a live block already having been rendered on a previous
+    # tick, as the ticker thread would do.
+    session._rendered_line_count = 3
+
+    session._echo_locked("Page 1 finished. Reading page 2.")
+
+    out = capsys.readouterr().out
+    # The previous block must be erased (cursor moved up and each of its
+    # lines cleared) before the scrolling message is printed.
+    assert "\x1b[3A" in out
+    assert "\x1b[K" in out
+    assert rendered[0] == ("echo", "Page 1 finished. Reading page 2.")
+    # The block is redrawn right after the message instead of leaving a
+    # stale/duplicated block behind.
+    assert rendered[1][0] == "render"
+
+
 def test_live_display_renders_status_updates_while_running():
     read_key = keys_from_sequence(["\r", " ", "\r"])
     rendered: list[str] = []

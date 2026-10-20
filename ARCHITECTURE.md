@@ -34,7 +34,11 @@ with `click`, and data is modeled with `pydantic`.
   `\x1b[{n}A` and clearing each line with `\x1b[K` before rewriting it, so
   each tick redraws the whole block in place. A lock shared between the
   ticker thread and the main thread's progress messages prevents the two
-  from interleaving on screen.
+  from interleaving on screen. Before printing a scrolling progress
+  message (e.g. "Page N finished..."), the session erases the
+  previously rendered live block first and redraws it right after the
+  message, so the block never lingers on screen and duplicates itself
+  down the page.
 - **`src/read_habit/timer/models.py`** -- `pydantic` models `PageRecord`
   (page number and duration) and `TimerStats` (session summary: pages
   read, slowest/fastest page, actual reading time, elapsed time, paused
