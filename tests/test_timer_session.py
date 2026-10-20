@@ -56,30 +56,46 @@ def test_session_pause_resume_cycle():
 
 def test_format_live_status_idle():
     timer = ReadingTimer(clock=make_clock())
-    status = format_live_status(timer)
-    assert "Elapsed: 0m 0s" in status
-    assert "Page 1: 0m 0s" in status
-    assert "Paused: 0m 0s" in status
+    status = format_live_status(timer, width=40)
+    assert "Elapsed time: 0m 0s" in status
+    assert "Actual time: 0m 0s" in status
+    assert "current page: 1" in status
+    assert "WAITING TO START" in status
 
 
 def test_format_live_status_running_and_paused():
     clock = make_clock()
     timer = ReadingTimer(clock=clock)
     timer.start()
-    status = format_live_status(timer)
-    assert "Elapsed:" in status
-    assert "Page 1:" in status
-    assert "(paused)" not in status
+    status = format_live_status(timer, width=40)
+    assert "Elapsed time:" in status
+    assert "current page: 1" in status
+    assert "READING" in status
+    assert "PAUSED" not in status
 
     timer.pause()
-    paused_status = format_live_status(timer)
-    assert "(paused)" in paused_status
+    paused_status = format_live_status(timer, width=40)
+    assert "PAUSED" in paused_status
 
 
-def test_default_render_overwrites_line_without_newline(capsys):
-    # The default renderer must write directly to stdout with a leading
-    # ``\r`` and no trailing newline, so repeated calls overwrite the
-    # same terminal line instead of scrolling a new one each tick.
+def test_format_live_status_includes_book_title():
+    timer = ReadingTimer(clock=make_clock())
+    status = format_live_status(timer, book_title="Dune", width=40)
+    assert "Dune" in status
+
+
+def test_format_live_status_centers_lines():
+    timer = ReadingTimer(clock=make_clock())
+    status = format_live_status(timer, width=40)
+    lines = status.split("\n")
+    assert all(len(line) == 40 for line in lines)
+
+
+def test_default_render_overwrites_block_without_scrolling(capsys):
+    # The default renderer must write the status block so that repeated
+    # calls overwrite the same lines instead of scrolling new ones each
+    # tick: it moves the cursor up to the start of the previous block
+    # before rewriting, and clears each line before writing new content.
     timer = ReadingTimer(clock=make_clock())
     session = ReadingSession(
         read_key=keys_from_sequence([]),
@@ -87,13 +103,15 @@ def test_default_render_overwrites_line_without_newline(capsys):
         echo=lambda *_: None,
     )
 
-    session._default_render("Elapsed: 0m 1s")
-    session._default_render("Elapsed: 0m 2s")
+    session._default_render("line one\nline two")
+    first = capsys.readouterr().out
+    assert "\x1b[" in first  # uses cursor/clear escape sequences
+    assert first.count("\n") == 2
 
-    captured = capsys.readouterr().out
-    assert "\n" not in captured
-    assert captured.count("\r") == 2
-    assert captured.endswith("Elapsed: 0m 2s\x1b[K")
+    session._default_render("line one\nline two")
+    second = capsys.readouterr().out
+    # Moves the cursor up before rewriting the same number of lines.
+    assert "\x1b[2A" in second
 
 
 def test_live_display_renders_status_updates_while_running():
@@ -113,4 +131,4 @@ def test_live_display_renders_status_updates_while_running():
     time.sleep(0.05)
 
     assert len(rendered) >= 1
-    assert any("Elapsed:" in line for line in rendered)
+    assert any("Elapsed time:" in line for line in rendered)
