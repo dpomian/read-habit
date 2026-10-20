@@ -2,32 +2,41 @@
 
 from __future__ import annotations
 
-import argparse
-from collections.abc import Sequence
+import click
 
 from read_habit import __version__
+from read_habit.timer.formatting import format_stats
+from read_habit.timer.session import ReadingSession
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Build the top-level argument parser."""
-    parser = argparse.ArgumentParser(
-        prog="read-habit",
-        description="Track your reading habits from the command line.",
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"%(prog)s {__version__}",
-    )
-    return parser
+@click.group(invoke_without_command=True)
+@click.version_option(__version__, prog_name="read-habit")
+@click.pass_context
+def cli(ctx: click.Context) -> None:
+    """Track your reading habits from the command line."""
+    if ctx.invoked_subcommand is None:
+        click.echo("read-habit: nothing to do yet. Try --help.")
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+@cli.command("timer")
+def timer_command() -> None:
+    """Run an interactive reading timer session.
+
+    Controls:
+      Enter  start the timer / stop it (works any time once started)
+      k      pause while running, resume while paused
+      Space  mark the current page as finished (only while running)
+    """
+    click.echo("Reading timer -- Enter: start/stop, k: pause/resume, Space: next page.")
+    session = ReadingSession(read_key=click.getchar)
+    stats = session.run()
+    click.echo(format_stats(stats))
+
+
+def main(argv: list[str] | None = None) -> int:
     """Entry point for the read-habit console script."""
-    parser = build_parser()
-    parser.parse_args(argv)
-    print("read-habit: nothing to do yet. Try --help.")
-    return 0
+    result = cli.main(args=argv, prog_name="read-habit", standalone_mode=False)
+    return result if isinstance(result, int) else 0
 
 
 if __name__ == "__main__":
