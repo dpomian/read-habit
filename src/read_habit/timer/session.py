@@ -211,10 +211,10 @@ class ReadingSession:
         if key == FINISH_PAGE_KEY:
             finished_page = self._timer.current_page
             self._timer.finish_page()
-            # self._echo_locked(
-            #     f"Page {finished_page} finished. Reading page "
-            #     f"{self._timer.current_page}."
-            # )
+            self._echo_locked(
+                f"Page {finished_page} finished. Reading page "
+                f"{self._timer.current_page}."
+            )
             return None
         raise InvalidTimerTransition(f"Unrecognized key: {key!r}")
 

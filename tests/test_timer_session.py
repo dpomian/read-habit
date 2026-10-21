@@ -4,6 +4,7 @@ import re
 import time
 
 from read_habit.timer.session import (
+    FINISH_PAGE_KEY,
     ReadingSession,
     format_live_status,
     keys_from_sequence,
@@ -250,6 +251,26 @@ def test_live_block_home_row_is_stable_across_page_turns(capsys):
     assert len(title_rows) == 1, (
         f"title appeared at rows {title_rows}, expected a single stable row"
     )
+
+
+def test_finish_page_key_prints_progress_message_through_handle_key():
+    # Regression test for the "Page N finished..." progress message being
+    # silently dropped: drives the real ``FINISH_PAGE_KEY`` path through
+    # ``_handle_key`` (as a real keypress would), rather than calling
+    # ``_echo_locked`` directly, to make sure the message is still wired
+    # up end-to-end and not just reachable in isolation.
+    timer = ReadingTimer(clock=make_clock())
+    timer.start()
+    rendered: list[tuple[str, str]] = []
+    session = ReadingSession(
+        read_key=keys_from_sequence([]),
+        timer=timer,
+        echo=lambda msg: rendered.append(("echo", msg)),
+    )
+
+    session._handle_key(FINISH_PAGE_KEY)
+
+    assert rendered == [("echo", "Page 1 finished. Reading page 2.")]
 
 
 def test_live_display_renders_status_updates_while_running():
