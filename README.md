@@ -44,11 +44,13 @@ Controls:
 
 The timer enforces these states: a page cannot be marked finished while
 paused, and pausing/resuming is only possible when the timer is running or
-paused respectively. While the timer is running or paused, a live status
-line showing the elapsed session time, the current page's reading time,
-and total paused time is updated in real time. When stopped, it prints
-pages read, slowest page, fastest page, actual reading time, elapsed time,
-and time spent paused. Every session is persisted as a JSON record at
+paused respectively. While the timer is running or paused, a live,
+centered status screen -- showing the book title and author (if any), the current
+status (`READING`/`PAUSED`), the elapsed and actual reading time, the
+control reminders, and the current page with its own elapsed time -- is
+redrawn in place every second. When stopped, it prints pages read, slowest
+page, fastest page, actual reading time, elapsed time, and time spent
+paused. Every session is persisted as a JSON record at
 `~/.read-habit/sessions.json`, including the id of the book it was linked
 to (if any).
 

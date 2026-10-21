@@ -110,6 +110,14 @@ class ReadingTimer:
             paused += self._clock() - self._pause_started_at
         return paused
 
+    def live_actual_seconds(self) -> float:
+        """Return the total actual reading time so far (elapsed minus paused).
+
+        This is the time spent actively reading, excluding any time spent
+        paused, up to and including right now.
+        """
+        return self.live_elapsed_seconds() - self.live_paused_seconds()
+
     def start(self) -> None:
         """Start the timer. Only valid from ``IDLE``."""
         if self._state is not TimerState.IDLE:

@@ -1,8 +1,10 @@
 """Tests for the interactive reading session key-handling loop."""
 
+import re
 import time
 
 from read_habit.timer.session import (
+    FINISH_PAGE_KEY,
     ReadingSession,
     format_live_status,
     keys_from_sequence,
@@ -17,6 +19,59 @@ def make_clock(start: float = 0.0):
         return state["now"]
 
     return clock
+
+
+_ANSI_SEQUENCE = re.compile(r"\x1b\[(\d*)([A-Za-z])")
+
+
+def _replay_rows(raw: str) -> list[str]:
+    """Replay raw terminal output (cursor-up and clear-line escapes, ``\\r``
+    and ``\\n``) against a virtual screen buffer and return its rows.
+
+    This mirrors how a real terminal would interpret the escape sequences
+    emitted by ``_default_render``/``_clear_rendered_block``, so tests can
+    assert the actual on-screen position of content instead of merely
+    checking that *some* escape sequence was printed.
+    """
+    rows: list[str] = [""]
+    row = col = 0
+    i, n = 0, len(raw)
+
+    def ensure(r: int) -> None:
+        while len(rows) <= r:
+            rows.append("")
+
+    while i < n:
+        char = raw[i]
+        if char == "\x1b":
+            match = _ANSI_SEQUENCE.match(raw, i)
+            assert match is not None, f"unrecognized escape at {i!r}"
+            count = int(match.group(1)) if match.group(1) else 1
+            command = match.group(2)
+            if command == "A":
+                row = max(0, row - count)
+            elif command == "K":
+                ensure(row)
+                rows[row] = rows[row][:col]
+            i = match.end()
+            continue
+        if char == "\r":
+            col = 0
+        elif char == "\n":
+            row += 1
+            col = 0
+            ensure(row)
+        else:
+            ensure(row)
+            line = rows[row]
+            if col < len(line):
+                line = line[:col] + char + line[col + 1 :]
+            else:
+                line = line + " " * (col - len(line)) + char
+            rows[row] = line
+            col += 1
+        i += 1
+    return rows
 
 
 def test_session_basic_flow_stops_and_returns_stats():
@@ -56,30 +111,58 @@ def test_session_pause_resume_cycle():
 
 def test_format_live_status_idle():
     timer = ReadingTimer(clock=make_clock())
-    status = format_live_status(timer)
-    assert "Elapsed: 0m 0s" in status
-    assert "Page 1: 0m 0s" in status
-    assert "Paused: 0m 0s" in status
+    status = format_live_status(timer, width=40)
+    assert "Elapsed time: 0m 0s" in status
+    assert "Actual time: 0m 0s" in status
+    assert "current page: 1" in status
+    assert "WAITING TO START" in status
 
 
 def test_format_live_status_running_and_paused():
     clock = make_clock()
     timer = ReadingTimer(clock=clock)
     timer.start()
-    status = format_live_status(timer)
-    assert "Elapsed:" in status
-    assert "Page 1:" in status
-    assert "(paused)" not in status
+    status = format_live_status(timer, width=40)
+    assert "Elapsed time:" in status
+    assert "current page: 1" in status
+    assert "READING" in status
+    assert "PAUSED" not in status
 
     timer.pause()
-    paused_status = format_live_status(timer)
-    assert "(paused)" in paused_status
+    paused_status = format_live_status(timer, width=40)
+    assert "PAUSED" in paused_status
 
 
-def test_default_render_overwrites_line_without_newline(capsys):
-    # The default renderer must write directly to stdout with a leading
-    # ``\r`` and no trailing newline, so repeated calls overwrite the
-    # same terminal line instead of scrolling a new one each tick.
+def test_format_live_status_includes_book_title():
+    timer = ReadingTimer(clock=make_clock())
+    status = format_live_status(timer, book_title="Dune", width=40)
+    assert "Dune" in status
+
+
+def test_format_live_status_includes_book_title_and_author():
+    timer = ReadingTimer(clock=make_clock())
+    status = format_live_status(
+        timer, book_title="Dune", book_author="Frank Herbert", width=40
+    )
+    assert "Dune" in status
+    assert "Frank Herbert" in status
+    assert "New reading session for 'Dune', by Frank Herbert" in status.replace(
+        "\n", ""
+    )
+
+
+def test_format_live_status_centers_lines():
+    timer = ReadingTimer(clock=make_clock())
+    status = format_live_status(timer, width=40)
+    lines = status.split("\n")
+    assert all(len(line) == 40 for line in lines)
+
+
+def test_default_render_overwrites_block_without_scrolling(capsys):
+    # The default renderer must write the status block so that repeated
+    # calls overwrite the same lines instead of scrolling new ones each
+    # tick: it moves the cursor up to the start of the previous block
+    # before rewriting, and clears each line before writing new content.
     timer = ReadingTimer(clock=make_clock())
     session = ReadingSession(
         read_key=keys_from_sequence([]),
@@ -87,13 +170,95 @@ def test_default_render_overwrites_line_without_newline(capsys):
         echo=lambda *_: None,
     )
 
-    session._default_render("Elapsed: 0m 1s")
-    session._default_render("Elapsed: 0m 2s")
+    session._default_render("line one\nline two")
+    first = capsys.readouterr().out
+    assert "\x1b[" in first  # uses cursor/clear escape sequences
+    assert first.count("\n") == 2
 
-    captured = capsys.readouterr().out
-    assert "\n" not in captured
-    assert captured.count("\r") == 2
-    assert captured.endswith("Elapsed: 0m 2s\x1b[K")
+    session._default_render("line one\nline two")
+    second = capsys.readouterr().out
+    # Moves the cursor up before rewriting the same number of lines.
+    assert "\x1b[2A" in second
+
+
+def test_refresh_live_status_redraws_block_without_scrolling_message():
+    # Regression test for the request to remove scrolling progress
+    # messages (e.g. "Page N finished...", "Timer started.") entirely:
+    # a page turn / pause / resume / stop must redraw the live block in
+    # place, without printing anything through ``echo``.
+    timer = ReadingTimer(clock=make_clock())
+    timer.start()
+    rendered: list[tuple[str, str]] = []
+    session = ReadingSession(
+        read_key=keys_from_sequence([]),
+        timer=timer,
+        echo=lambda msg: rendered.append(("echo", msg)),
+        live_display=True,
+        render_live_status=lambda status: rendered.append(("render", status)),
+    )
+
+    session._handle_key(FINISH_PAGE_KEY)
+
+    assert all(kind == "render" for kind, _ in rendered)
+    assert len(rendered) == 1
+
+
+def test_live_block_home_row_is_stable_across_page_turns(capsys):
+    # Regression test for the title duplicating down the screen on every
+    # page turn (reported against three prior "fixed" attempts). Drives a
+    # real ``ReadingSession`` with the *actual* ``_default_render``, then
+    # replays the raw escape-sequence output against a virtual terminal
+    # buffer, like a real terminal would. The title line must stay at the
+    # same screen row across repeated render cycles instead of drifting
+    # or being duplicated further down the page.
+    timer = ReadingTimer(clock=make_clock())
+    timer.start()
+    session = ReadingSession(
+        read_key=keys_from_sequence([]),
+        timer=timer,
+        echo=print,
+        live_display=True,
+        book_title="Dune",
+        book_author="Frank Herbert",
+    )
+
+    session._render_live_status(
+        format_live_status(timer, book_title="Dune", book_author="Frank Herbert")
+    )
+    for _ in range(3):
+        session._handle_key(FINISH_PAGE_KEY)
+
+    raw = capsys.readouterr().out
+    rows = _replay_rows(raw)
+
+    title_rows = [
+        idx for idx, line in enumerate(rows) if "New reading session" in line
+    ]
+    # The title must occupy exactly one screen row at any time -- it must
+    # not be left behind as a stale duplicate while a new block is drawn
+    # further down the page.
+    assert len(title_rows) == 1, (
+        f"title appeared at rows {title_rows}, expected a single stable row"
+    )
+
+
+def test_finish_page_key_does_not_print_progress_message():
+    # Regression test for the user's request to remove scrolling prints
+    # such as "Page N finished. Reading page N+1." -- drives the real
+    # ``FINISH_PAGE_KEY`` path through ``_handle_key`` and asserts no
+    # message is echoed.
+    timer = ReadingTimer(clock=make_clock())
+    timer.start()
+    rendered: list[tuple[str, str]] = []
+    session = ReadingSession(
+        read_key=keys_from_sequence([]),
+        timer=timer,
+        echo=lambda msg: rendered.append(("echo", msg)),
+    )
+
+    session._handle_key(FINISH_PAGE_KEY)
+
+    assert not any(kind == "echo" for kind, _ in rendered)
 
 
 def test_live_display_renders_status_updates_while_running():
@@ -113,4 +278,4 @@ def test_live_display_renders_status_updates_while_running():
     time.sleep(0.05)
 
     assert len(rendered) >= 1
-    assert any("Elapsed:" in line for line in rendered)
+    assert any("Elapsed time:" in line for line in rendered)

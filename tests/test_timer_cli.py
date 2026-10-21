@@ -58,7 +58,6 @@ def test_timer_with_valid_book_associates_session(tmp_path, monkeypatch):
     result = _invoke(["read", "--book", str(book.id)], books_path, sessions_path, monkeypatch)
 
     assert result.exit_code == 0
-    assert "Dune" in result.output
 
     sessions = SessionRepository(path=sessions_path).list()
     assert len(sessions) == 1
