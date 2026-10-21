@@ -154,12 +154,24 @@ class ReadingSession:
         # Move the cursor back up to the start of the previously rendered
         # live block (if any) and blank out each of its lines, so the
         # block does not linger on screen as a stale, duplicate frame.
+        #
+        # ``_default_render`` ends each line with ``\n``, so after writing
+        # ``N`` lines the cursor sits one row *below* the block, at
+        # ``top + N``. To blank the block in place we move up ``N`` rows to
+        # ``top``, then write ``N`` blank lines, which (because each of
+        # those also ends with ``\n``) leaves the cursor back at
+        # ``top + N`` -- i.e. directly below the now-blank block. That is
+        # exactly where the next bit of output (a scrolling message, or a
+        # fresh render of the block) belongs: moving up a second time here
+        # would land back on the block's own first row and let a plain
+        # ``print()`` overwrite the title instead of appending below it,
+        # permanently shifting the block's home row up each time a message
+        # is echoed.
         if not self._rendered_line_count:
             return
         sys.stdout.write(f"\x1b[{self._rendered_line_count}A")
         for _ in range(self._rendered_line_count):
             sys.stdout.write("\r\x1b[K\n")
-        sys.stdout.write(f"\x1b[{self._rendered_line_count}A")
         sys.stdout.flush()
         self._rendered_line_count = 0
 
@@ -199,10 +211,10 @@ class ReadingSession:
         if key == FINISH_PAGE_KEY:
             finished_page = self._timer.current_page
             self._timer.finish_page()
-            self._echo_locked(
-                f"Page {finished_page} finished. Reading page "
-                f"{self._timer.current_page}."
-            )
+            # self._echo_locked(
+            #     f"Page {finished_page} finished. Reading page "
+            #     f"{self._timer.current_page}."
+            # )
             return None
         raise InvalidTimerTransition(f"Unrecognized key: {key!r}")
 
