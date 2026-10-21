@@ -181,15 +181,14 @@ def test_default_render_overwrites_block_without_scrolling(capsys):
     assert "\x1b[2A" in second
 
 
-def test_echo_locked_clears_previous_block_before_scrolling_message(capsys):
-    # Regression test for the header duplicating down the screen every
-    # time a page finished: before this fix, ``_echo_locked`` printed the
-    # scrolling message without erasing the previously rendered live
-    # block first, so the block (including the "New reading session
-    # for..." title) stayed on screen and a new one was rendered below it
-    # on every tick, stacking up down the page.
+def test_refresh_live_status_redraws_block_without_scrolling_message():
+    # Regression test for the request to remove scrolling progress
+    # messages (e.g. "Page N finished...", "Timer started.") entirely:
+    # a page turn / pause / resume / stop must redraw the live block in
+    # place, without printing anything through ``echo``.
     timer = ReadingTimer(clock=make_clock())
-    rendered: list[str] = []
+    timer.start()
+    rendered: list[tuple[str, str]] = []
     session = ReadingSession(
         read_key=keys_from_sequence([]),
         timer=timer,
@@ -198,21 +197,10 @@ def test_echo_locked_clears_previous_block_before_scrolling_message(capsys):
         render_live_status=lambda status: rendered.append(("render", status)),
     )
 
-    # Simulate a live block already having been rendered on a previous
-    # tick, as the ticker thread would do.
-    session._rendered_line_count = 3
+    session._handle_key(FINISH_PAGE_KEY)
 
-    session._echo_locked("Page 1 finished. Reading page 2.")
-
-    out = capsys.readouterr().out
-    # The previous block must be erased (cursor moved up and each of its
-    # lines cleared) before the scrolling message is printed.
-    assert "\x1b[3A" in out
-    assert "\x1b[K" in out
-    assert rendered[0] == ("echo", "Page 1 finished. Reading page 2.")
-    # The block is redrawn right after the message instead of leaving a
-    # stale/duplicated block behind.
-    assert rendered[1][0] == "render"
+    assert all(kind == "render" for kind, _ in rendered)
+    assert len(rendered) == 1
 
 
 def test_live_block_home_row_is_stable_across_page_turns(capsys):
@@ -221,9 +209,10 @@ def test_live_block_home_row_is_stable_across_page_turns(capsys):
     # real ``ReadingSession`` with the *actual* ``_default_render``, then
     # replays the raw escape-sequence output against a virtual terminal
     # buffer, like a real terminal would. The title line must stay at the
-    # same screen row across repeated echo/render cycles instead of
-    # drifting or being duplicated further down the page.
+    # same screen row across repeated render cycles instead of drifting
+    # or being duplicated further down the page.
     timer = ReadingTimer(clock=make_clock())
+    timer.start()
     session = ReadingSession(
         read_key=keys_from_sequence([]),
         timer=timer,
@@ -236,8 +225,8 @@ def test_live_block_home_row_is_stable_across_page_turns(capsys):
     session._render_live_status(
         format_live_status(timer, book_title="Dune", book_author="Frank Herbert")
     )
-    for i in range(3):
-        session._echo_locked(f"Page {i + 1} finished. Reading page {i + 2}.")
+    for _ in range(3):
+        session._handle_key(FINISH_PAGE_KEY)
 
     raw = capsys.readouterr().out
     rows = _replay_rows(raw)
@@ -253,12 +242,11 @@ def test_live_block_home_row_is_stable_across_page_turns(capsys):
     )
 
 
-def test_finish_page_key_prints_progress_message_through_handle_key():
-    # Regression test for the "Page N finished..." progress message being
-    # silently dropped: drives the real ``FINISH_PAGE_KEY`` path through
-    # ``_handle_key`` (as a real keypress would), rather than calling
-    # ``_echo_locked`` directly, to make sure the message is still wired
-    # up end-to-end and not just reachable in isolation.
+def test_finish_page_key_does_not_print_progress_message():
+    # Regression test for the user's request to remove scrolling prints
+    # such as "Page N finished. Reading page N+1." -- drives the real
+    # ``FINISH_PAGE_KEY`` path through ``_handle_key`` and asserts no
+    # message is echoed.
     timer = ReadingTimer(clock=make_clock())
     timer.start()
     rendered: list[tuple[str, str]] = []
@@ -270,7 +258,7 @@ def test_finish_page_key_prints_progress_message_through_handle_key():
 
     session._handle_key(FINISH_PAGE_KEY)
 
-    assert rendered == [("echo", "Page 1 finished. Reading page 2.")]
+    assert not any(kind == "echo" for kind, _ in rendered)
 
 
 def test_live_display_renders_status_updates_while_running():

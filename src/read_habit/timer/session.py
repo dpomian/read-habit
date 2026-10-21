@@ -86,14 +86,13 @@ class ReadingSession:
 
     def run(self) -> TimerStats:
         """Run the session until the timer is stopped and return stats."""
-        self._echo("Press Enter to start the timer.")
         self._start_ticker()
         try:
             while self._timer.state is TimerState.IDLE:
                 key = self._read_key()
                 if key in ENTER_KEYS:
                     self._timer.start()
-                    self._echo_locked("Timer started. Reading page 1.")
+                    self._refresh_live_status()
 
             while True:
                 key = self._read_key()
@@ -150,71 +149,38 @@ class ReadingSession:
         self._rendered_line_count = len(lines)
         sys.stdout.flush()
 
-    def _clear_rendered_block(self) -> None:
-        # Move the cursor back up to the start of the previously rendered
-        # live block (if any) and blank out each of its lines, so the
-        # block does not linger on screen as a stale, duplicate frame.
-        #
-        # ``_default_render`` ends each line with ``\n``, so after writing
-        # ``N`` lines the cursor sits one row *below* the block, at
-        # ``top + N``. To blank the block in place we move up ``N`` rows to
-        # ``top``, then write ``N`` blank lines, which (because each of
-        # those also ends with ``\n``) leaves the cursor back at
-        # ``top + N`` -- i.e. directly below the now-blank block. That is
-        # exactly where the next bit of output (a scrolling message, or a
-        # fresh render of the block) belongs: moving up a second time here
-        # would land back on the block's own first row and let a plain
-        # ``print()`` overwrite the title instead of appending below it,
-        # permanently shifting the block's home row up each time a message
-        # is echoed.
-        if not self._rendered_line_count:
+    def _refresh_live_status(self) -> None:
+        # Immediately redraw the live block after a state change instead
+        # of waiting for the next tick, so the status (e.g. READING vs.
+        # PAUSED, the current page) updates in real time. No scrolling
+        # progress message is printed: the live block already conveys
+        # everything a user needs to see.
+        if not self._live_display:
             return
-        sys.stdout.write(f"\x1b[{self._rendered_line_count}A")
-        for _ in range(self._rendered_line_count):
-            sys.stdout.write("\r\x1b[K\n")
-        sys.stdout.flush()
-        self._rendered_line_count = 0
-
-    def _echo_locked(self, message: str) -> None:
         with self._output_lock:
-            # Erase the previous live block before printing a normal
-            # scrolling message, otherwise the block is left behind on
-            # screen and a fresh block printed below it every tick ends
-            # up duplicating the title/header down the page.
-            self._clear_rendered_block()
-            self._echo(message)
-            if self._live_display:
-                # Redraw the block immediately below the message instead
-                # of waiting for the next tick, so there is no stale gap
-                # and the next tick's cursor-up tracking starts in sync.
-                self._render_live_status(
-                    format_live_status(
-                        self._timer,
-                        book_title=self._book_title,
-                        book_author=self._book_author,
-                    )
+            self._render_live_status(
+                format_live_status(
+                    self._timer,
+                    book_title=self._book_title,
+                    book_author=self._book_author,
                 )
+            )
 
     def _handle_key(self, key: str) -> TimerStats | None:
         if key in ENTER_KEYS:
             stats = self._timer.stop()
-            self._echo_locked("Timer stopped.")
+            self._refresh_live_status()
             return stats
         if key == PAUSE_RESUME_KEY:
             if self._timer.state is TimerState.RUNNING:
                 self._timer.pause()
-                self._echo_locked("Timer paused. Press 'k' to resume.")
             else:
                 self._timer.resume()
-                self._echo_locked(f"Timer resumed. Reading page {self._timer.current_page}.")
+            self._refresh_live_status()
             return None
         if key == FINISH_PAGE_KEY:
-            finished_page = self._timer.current_page
             self._timer.finish_page()
-            self._echo_locked(
-                f"Page {finished_page} finished. Reading page "
-                f"{self._timer.current_page}."
-            )
+            self._refresh_live_status()
             return None
         raise InvalidTimerTransition(f"Unrecognized key: {key!r}")
 

@@ -33,12 +33,11 @@ with `click`, and data is modeled with `pydantic`.
   moving the cursor back up over the previously rendered block with
   `\x1b[{n}A` and clearing each line with `\x1b[K` before rewriting it, so
   each tick redraws the whole block in place. A lock shared between the
-  ticker thread and the main thread's progress messages prevents the two
-  from interleaving on screen. Before printing a scrolling progress
-  message (e.g. "Page N finished..."), the session erases the
-  previously rendered live block first and redraws it right after the
-  message, so the block never lingers on screen and duplicates itself
-  down the page.
+  ticker thread and key-driven state changes prevents the two from
+  interleaving on screen. State changes (start, pause, resume, page
+  finished, stop) redraw the live block immediately instead of printing a
+  scrolling progress message, so nothing scrolls past and the block is
+  the single source of truth for what is happening.
 - **`src/read_habit/timer/models.py`** -- `pydantic` models `PageRecord`
   (page number and duration) and `TimerStats` (session summary: pages
   read, slowest/fastest page, actual reading time, elapsed time, paused
@@ -75,8 +74,8 @@ with `click`, and data is modeled with `pydantic`.
    is validated against `BookRepository` up front), constructing a
    `ReadingSession` wrapping a `ReadingTimer`.
 2. `ReadingSession.run()` loops: it reads a key, forwards it to the timer
-   (`start`/`pause`/`resume`/`finish_page`/`stop`), and echoes progress
-   messages. Invalid actions for the current state raise
+   (`start`/`pause`/`resume`/`finish_page`/`stop`), and redraws the live
+   status block. Invalid actions for the current state raise
    `InvalidTimerTransition` and are silently ignored.
 3. On `stop()`, `ReadingTimer` returns a `TimerStats` instance, which
    `cli.py` passes to `format_stats()` and prints to the terminal, then

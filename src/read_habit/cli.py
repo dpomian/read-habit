@@ -49,9 +49,6 @@ def read_command(book_id: int | None) -> None:
             raise click.ClickException(str(exc)) from exc
         book_title = book.title
         book_author = book.author
-        click.echo(f"Reading timer for '{book_title}'.")
-    else:
-        click.echo("Reading timer.")
 
     session = ReadingSession(
         read_key=click.getchar,
